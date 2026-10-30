@@ -22,13 +22,18 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// TODO: load config, connect to Postgres
 	db, err := store.Connect(ctx, os.Getenv("DATABASE_URL"))
 	if err != nil {
 		slog.Error("database connection failed", "error", err)
 		os.Exit(1)
 	}
 	defer db.Close()
+
+	if err := db.Migrate(ctx); err != nil {
+		slog.Error("migration failed", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("migrations applied")
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
