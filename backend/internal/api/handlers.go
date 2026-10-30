@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"log/slog"
@@ -22,8 +23,15 @@ func RegisterRoutes(r chi.Router, db *store.DB, logger *slog.Logger) {
 
 func listBatches(db *store.DB, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Placeholder — replace with real query
-		batches := []domain.Batch{}
+		batches, err := db.ListBatches(r.Context())
+		if err != nil {
+			logger.Error("list batches", "error", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		if batches == nil {
+			batches = []domain.Batch{}
+		}
 		writeJSON(w, http.StatusOK, batches)
 	}
 }
@@ -35,8 +43,30 @@ func createBatch(db *store.DB, logger *slog.Logger) http.HandlerFunc {
 			http.Error(w, "invalid json", http.StatusBadRequest)
 			return
 		}
-		// TODO: validate, persist, write audit event
-		b.Status = domain.BatchStatusDraft
+		if strings.TrimSpace(b.Number) == "" || strings.TrimSpace(b.ProductName) == "" {
+			http.Error(w, "number and product_name required", http.StatusBadRequest)
+			return
+		}
+		if b.Status == "" {
+			b.Status = domain.BatchStatusDraft
+		}
+
+		// Temporary actor until real auth is wired
+		actorID := r.Header.Get("X-Actor-ID")
+		if actorID == "" {
+			actorID = "system"
+		}
+		actorName := r.Header.Get("X-Actor-Name")
+		if actorName == "" {
+			actorName = "System"
+		}
+		ip := r.RemoteAddr
+
+		if err := db.CreateBatch(r.Context(), &b, actorID, actorName, ip); err != nil {
+			logger.Error("create batch", "error", err)
+			http.Error(w, "failed to create batch", http.StatusInternalServerError)
+			return
+		}
 		writeJSON(w, http.StatusCreated, b)
 	}
 }
@@ -44,8 +74,17 @@ func createBatch(db *store.DB, logger *slog.Logger) http.HandlerFunc {
 func getBatch(db *store.DB, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
-		// TODO: load from DB
-		writeJSON(w, http.StatusOK, map[string]string{"id": id, "status": "placeholder"})
+		b, err := db.GetBatch(r.Context(), id)
+		if err != nil {
+			logger.Error("get batch", "error", err, "id", id)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		if b == nil {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		writeJSON(w, http.StatusOK, b)
 	}
 }
 
