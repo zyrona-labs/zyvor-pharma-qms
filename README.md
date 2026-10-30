@@ -8,14 +8,14 @@ Focused on small and midsize pharmaceutical manufacturers, contract manufacturer
 
 ## Status
 
-Early development. Core domain models and UI skeleton in progress.  
+Early development. Batches are now persisted to PostgreSQL with append-only audit events. Migrations run on startup.  
 **Not a validated system.** Validation documentation is built alongside the software. Deployment readiness does not establish regulatory compliance (e.g. 21 CFR Part 11, EU GMP Annex 11, WHO).
 
 ## Stack
 
 - **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS — Apple-inspired Liquid Glass aesthetic (top navigation, command palette, glassmorphism, dark-first).
-- **Backend**: Go (chi, pgx, sqlc) with append-only audit trails and electronic signature hooks.
-- **Database**: PostgreSQL (strong consistency, audit-friendly).
+- **Backend**: Go (chi, pgx, shopspring/decimal) with append-only audit trails.
+- **Database**: PostgreSQL (strong consistency, audit-friendly). Schema in `backend/migrations/`.
 - **Infrastructure**: Kubernetes + Envoy (API gateway). Local development via Docker Compose.
 - **AI**: Source-linked SOP answers and quality-report drafts that require human review before any action.
 
@@ -34,7 +34,10 @@ Early development. Core domain models and UI skeleton in progress.
 ## Quick start (local)
 
 ```bash
-# Backend
+# Start Postgres (or use docker compose)
+docker compose up -d postgres
+
+# Backend (runs migrations on start)
 cd backend && go run ./cmd/server
 
 # Frontend
